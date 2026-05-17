@@ -15,40 +15,39 @@ namespace QFXView
 			// Positional argument: file path (required)
 			var fileArg = new Argument<string>("file") { Description = "Path to QFX/OFX/QFX file" };
 
-			var allOption = new Option<bool>(new[] { "--all", "-a", "/all" }) { Description = "Show all fields" };
+			var detailOption = new Option<bool>(new[] { "--detail", "-d", "/detail", "/d" }) { Description = "Show detail of all fields" };
 
-			var rangeOption = new Option<bool>(new[] { "--range", "-r", "/range" }) { Description = "Show date range (oldest and newest transaction)" };
+			var rangeOption = new Option<bool>(new[] { "--range", "-r", "/range", "/r" }) { Description = "Show date range (oldest and newest transaction)" };
 
 			var root = new RootCommand
 			{
 				fileArg,
-				allOption,
+				detailOption,
 				rangeOption
 			};
 
-			root.SetHandler((string file, bool showAll, bool showRange) =>
+			root.SetHandler((string file, bool showDetail, bool showRange) =>
 			{
-				if (showAll && showRange)
+				if (showDetail && showRange)
 				{
-					Console.Error.WriteLine("Options /all and /range are mutually exclusive.");
+					Console.Error.WriteLine("Options /detail and /range are mutually exclusive.");
 					Environment.ExitCode = 1;
 					return;
 				}
-
 				if (showRange)
 				{
 					PrintRange(file);
 					return;
 				}
 
-				Parse(file, showAll);
+				Parse(file, showDetail);
 				return;
-			}, fileArg, allOption, rangeOption);
+			}, fileArg, detailOption, rangeOption);
 
 			return await root.InvokeAsync(args);
 		}
 
-		static void Parse(string filePath, bool showAll)
+		static void Parse(string filePath, bool showDetail)
 		{
 			if (!File.Exists(filePath))
 			{
@@ -60,6 +59,7 @@ namespace QFXView
 
 			// Find each <STMTTRN>...</STMTTRN> block (singleline so '.' matches newlines)
 			var stmtMatches = QfxHelpers.StmtRegex.Matches(text);
+			
 			// Find tags like <TAG>value (OFX/QFX often uses SGML-style tags without explicit closing tags)
 			// tagRegex is available via QfxHelpers.TagRegex
 
@@ -125,36 +125,23 @@ namespace QFXView
 				Console.WriteLine($"Type={tx.Type ?? "(unknown)"} Date={(tx.Date.HasValue ? tx.Date.Value.ToString(QfxHelpers.DateOutputFormat) : "(unknown)")} Amount={(tx.Amount.HasValue ? tx.Amount.Value.ToString(CultureInfo.InvariantCulture) : "(unknown)" )} Name={tx.Name ?? "(none)"} FITID={tx.FitId ?? "(none)"}");
 
 				// If requested, print all fields for debugging
-				if (showAll)
+				if (showDetail)
 				{
 					foreach (var kv in tx.Fields)
 					{
 						Console.WriteLine($"  {kv.Key}: {kv.Value}");
 					}
+			
+					Console.WriteLine();
 				}
-
-				//Console.WriteLine();
 			}
 		}
 
 		static void PrintRange(string filePath)
 		{
-			if (!File.Exists(filePath))
-			{
-				Console.WriteLine($"File not found: {filePath}");
+			var stmtMatches = GetTransactionBlocks(filePath);
+			if (stmtMatches == null)
 				return;
-			}
-
-			string text = File.ReadAllText(filePath);
-
-			// Find each <STMTTRN>...</STMTTRN> block (singleline so '.' matches newlines)
-			var stmtMatches = QfxHelpers.StmtRegex.Matches(text);
-			// tag regex available as QfxHelpers.TagRegex
-			if (stmtMatches.Count == 0)
-			{
-				Console.WriteLine("No transactions found.");
-				return;
-			}
 
 			DateTime? oldest = null;
 			DateTime? newest = null;
@@ -172,6 +159,7 @@ namespace QFXView
 					{
 						// DTPOSTED often looks like YYYYMMDD or YYYYMMDDHHMMSS... parse first 8 digits
 						var m = QfxHelpers.Date8Regex.Match(value);
+
 						if (m.Success && DateTime.TryParseExact(m.Value, QfxHelpers.DateParseFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
 						{
 							if (!oldest.HasValue || dt < oldest.Value) oldest = dt;
@@ -187,8 +175,29 @@ namespace QFXView
 				return;
 			}
 
-			Console.WriteLine($"Oldest: {oldest.Value.ToString("yyyy-MM-dd")}");
-			Console.WriteLine($"Newest: {newest.Value.ToString("yyyy-MM-dd")}");
+			Console.WriteLine($"Oldest: {oldest.Value.ToString(QfxHelpers.DateOutputFormat)}");
+			Console.WriteLine($"Newest: {newest.Value.ToString(QfxHelpers.DateOutputFormat)}");
+		}
+
+		static MatchCollection? GetTransactionBlocks(string filePath)
+		{
+			if (!File.Exists(filePath))
+			{
+				Console.WriteLine($"File not found: {filePath}");
+				return null;
+			}
+
+			string text = File.ReadAllText(filePath);
+
+			var stmtMatches = QfxHelpers.StmtRegex.Matches(text);
+
+			if (stmtMatches.Count == 0)
+			{
+				Console.WriteLine("No transactions found.");
+				return null;
+			}
+
+			return stmtMatches;
 		}
 
 		internal class Transaction

@@ -1,10 +1,6 @@
-﻿using System;
-using System.IO;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using System.Globalization;
-using System.Threading.Tasks;
 using System.CommandLine;
-using System.CommandLine.Invocation;
 
 namespace QFXView
 {
@@ -15,9 +11,13 @@ namespace QFXView
 			// Positional argument: file path (required)
 			var fileArg = new Argument<string>("file") { Description = "Path to QFX/OFX/QFX file" };
 
-			var detailOption = new Option<bool>(new[] { "--detail", "-d", "/detail", "/d" }) { Description = "Show detail of all fields" };
+			var detailOption = 
+				new Option<bool>(["--detail", "-d", "/detail", "/d"]) 
+					{ Description = "Show detail of all fields" };
 
-			var rangeOption = new Option<bool>(new[] { "--range", "-r", "/range", "/r" }) { Description = "Show date range (oldest and newest transaction)" };
+			var rangeOption = 
+				new Option<bool>(["--range", "-r", "/range", "/r"]) 
+					{ Description = "Show date range (oldest and newest transaction)" };
 
 			var root = new RootCommand
 			{
@@ -26,7 +26,7 @@ namespace QFXView
 				rangeOption
 			};
 
-			root.SetHandler((string file, bool showDetail, bool showRange) =>
+			root.SetHandler((file, showDetail, showRange) =>
 			{
 				if (showDetail && showRange)
 				{
@@ -40,14 +40,13 @@ namespace QFXView
 					return;
 				}
 
-				Parse(file, showDetail);
-				return;
+				ListTransactions(file, showDetail);
 			}, fileArg, detailOption, rangeOption);
 
 			return await root.InvokeAsync(args);
 		}
 
-		static void Parse(string filePath, bool showDetail)
+		static void ListTransactions(string filePath, bool showDetail)
 		{
 			if (!File.Exists(filePath))
 			{
@@ -69,7 +68,6 @@ namespace QFXView
 				return;
 			}
 
-			int idx = 1;
 			foreach (Match stmt in stmtMatches)
 			{
 				string block = stmt.Groups[1].Value;
@@ -139,7 +137,7 @@ namespace QFXView
 
 		static void PrintRange(string filePath)
 		{
-			var stmtMatches = GetTransactionBlocks(filePath);
+			var stmtMatches = GetTransactions(filePath);
 			if (stmtMatches == null)
 				return;
 
@@ -179,7 +177,7 @@ namespace QFXView
 			Console.WriteLine($"Newest: {newest.Value.ToString(QfxHelpers.DateOutputFormat)}");
 		}
 
-		static MatchCollection? GetTransactionBlocks(string filePath)
+		static MatchCollection? GetTransactions(string filePath)
 		{
 			if (!File.Exists(filePath))
 			{

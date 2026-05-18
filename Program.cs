@@ -1,6 +1,6 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.CommandLine;
 using System.Globalization;
-using System.CommandLine;
+using System.Text.RegularExpressions;
 
 namespace QFXView
 {
@@ -30,11 +30,11 @@ namespace QFXView
 			var fileArg = new Argument<string>("file") { Description = "Path to QFX/OFX/QFX file" };
 
 			var detailOption = 
-				new Option<bool>(["--detail", "-d", "/detail", "/d"]) 
+				new Option<bool>(new[] { "--detail", "-d", "/detail", "/d" }) 
 					{ Description = "Show detail of all fields" };
 
 			var rangeOption = 
-				new Option<bool>(["--range", "-r", "/range", "/r"]) 
+				new Option<bool>(new[] { "--range", "-r", "/range", "/r" }) 
 					{ Description = "Show date range (oldest and newest transaction)" };
 
 			var root = new RootCommand
@@ -52,17 +52,58 @@ namespace QFXView
 					Environment.ExitCode = 1;
 					return;
 				}
-				if (showRange)
+
+
+				var files = ResolveFilePaths(file).ToList();
+				if (!files.Any())
 				{
-					PrintRange(file);
+					Console.Error.WriteLine($"No files match: {file}");
+					Environment.ExitCode = 1;
 					return;
 				}
 
-				ListTransactions(file, showDetail);
+				if (showRange)
+				{
+					foreach (var f in files)
+					{
+						Console.WriteLine($"File: {f}");
+						PrintRange(f);
+					}
+					return;
+				}
+
+				foreach (var f in files)
+				{
+					ListTransactions(f, showDetail);
+				}
+
+				return;
 			}, fileArg, detailOption, rangeOption);
 
 			return await root.InvokeAsync(args);
 		}
+
+		static MatchCollection? GetTransactions(string filePath)
+		{
+			if (!File.Exists(filePath))
+			{
+				Console.WriteLine($"File not found: {filePath}");
+				return null;
+			}
+
+			string text = File.ReadAllText(filePath);
+
+			var stmtMatches = QfxHelpers.StmtRegex.Matches(text);
+
+			if (stmtMatches.Count == 0)
+			{
+				Console.WriteLine("No transactions found.");
+				return null;
+			}
+
+			return stmtMatches;
+		}
+
 
 		static void ListTransactions(string filePath, bool showDetail)
 		{
@@ -195,25 +236,31 @@ namespace QFXView
 			Console.WriteLine($"Newest: {newest.Value.ToString(QfxHelpers.DateOutputFormat)}");
 		}
 
-		static MatchCollection? GetTransactions(string filePath)
+		static IEnumerable<string> ResolveFilePaths(string filePath)
 		{
-			if (!File.Exists(filePath))
+			// If the path contains wildcard characters, expand using Directory.GetFiles
+			if (filePath.IndexOfAny(['*', '?']) >= 0)
 			{
-				Console.WriteLine($"File not found: {filePath}");
-				return null;
+				var dir = Path.GetDirectoryName(filePath);
+				
+				if (string.IsNullOrEmpty(dir))
+				{
+					dir = Directory.GetCurrentDirectory();
+				}
+
+				var pattern = Path.GetFileName(filePath);
+				try
+				{
+					return Directory.GetFiles(dir, pattern);
+				}
+				catch
+				{
+					return Array.Empty<string>();
+				}
 			}
 
-			string text = File.ReadAllText(filePath);
-
-			var stmtMatches = QfxHelpers.StmtRegex.Matches(text);
-
-			if (stmtMatches.Count == 0)
-			{
-				Console.WriteLine("No transactions found.");
-				return null;
-			}
-
-			return stmtMatches;
+			// No wildcard, return the single path as-is
+			return new[] { filePath };
 		}
 
 		internal class Transaction

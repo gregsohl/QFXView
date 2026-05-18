@@ -21,8 +21,9 @@ namespace QFXView
 		/// will print an error and set a non-zero exit code.
 		/// Examples:
 		///   QFXView transactions.qfx
-		///   QFXView transactions.qfx --detail
-		///   QFXView statement.ofx --range
+		///   QFXView transactions.qfx /detail
+		///   QFXView statement.ofx -range
+		///   QFXView "C:\Downloads\*.qfx" 
 		/// </remarks>
 		static async Task<int> Main(string[] args)
 		{

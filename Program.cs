@@ -6,6 +6,24 @@ namespace QFXView
 {
 	internal class Program
 	{
+		/// <summary>
+		/// Application entry point.
+		/// </summary>
+		/// <param name="args">Command-line arguments.
+		/// Expected usage: QFXView &lt;file&gt; [--detail|-d|/detail] [--range|-r|/range]
+		/// </param>
+		/// <remarks>
+		/// Parameters:
+		/// - file: Required positional path to the QFX/OFX file to process.
+		/// - --detail, -d, /detail: Optional flag to print all fields for each transaction (detailed view).
+		/// - --range, -r, /range: Optional flag to print the date range (oldest and newest transaction) only.
+		/// The --detail and --range options are mutually exclusive; if both are provided the program
+		/// will print an error and set a non-zero exit code.
+		/// Examples:
+		///   QFXView transactions.qfx
+		///   QFXView transactions.qfx --detail
+		///   QFXView statement.ofx --range
+		/// </remarks>
 		static async Task<int> Main(string[] args)
 		{
 			// Positional argument: file path (required)

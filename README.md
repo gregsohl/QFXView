@@ -6,6 +6,7 @@ Simple command-line utility to read QFX/OFX transaction files and print a concis
 Features
 
 - Print a one-line summary for each transaction (type, date, amount, name, fit id).
+- Process a single file or multiple files using wildcards (e.g., `*.qfx`).
 - Optional detailed output of all parsed fields for each transaction.
 - Optional date-range mode to print oldest and newest transaction dates.
 
@@ -34,6 +35,7 @@ Examples
 dotnet run -- transactions.qfx
 dotnet run -- transactions.qfx --detail
 dotnet run -- statement.ofx --range
+dotnet run -- "c:\Downloads\*.qfx"
 ```
 
 Project
